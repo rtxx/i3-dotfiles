@@ -13,7 +13,6 @@ pacman -Syu --needed i3-gaps i3status py3status i3lock xss-lock python-i3ipc dme
 ### Theme's and icons
 ```
 pacman -Syu --needed breeze breeze-gtk materia-gtk-theme materia-kde capitaine-cursors papirus-icon-theme feh picom conky noto-fonts noto-fonts-emoji ttf-fantasque-sans-mono
-xsettingsd jq unclutter scrot gpaste 
 ```
 AUR
 ```
