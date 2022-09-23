@@ -1,0 +1,5 @@
+! color scheme
+#include ".Xresources.d/theme.Xresources"
+
+! config
+#include ".Xresources.d/config"
