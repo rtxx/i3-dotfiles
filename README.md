@@ -1,6 +1,9 @@
 # i3-dotfiles
 ## My personal dotfiles for i3 (and Arch Linux)
 
+Warning!
+This is my personal dotfiles and configurations that I use with i3 and Arch Linux so stuff may not work OOTB.. Please be free to check it out, but be careful, some of the settings is made for my hardware (Example: in my i3status config it's specific for my wifi and ethernet).
+
 ## Prerequisites
 ### i3 wm
 ```
