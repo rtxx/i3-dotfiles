@@ -33,3 +33,6 @@ I created a script that automatically changes the theme from a bunch of programs
 
 ### Dunst
 Dunst config file is automatically made everytime ```sunset``` is used, so be careful, any change is going to be erased. If a change is needed, then change at ```gendunst```, inside ```sunset``` folder.
+
+### qt5ct
+Append ```QT_QPA_PLATFORMTHEME=qt5ctkitty``` to ```/etc/environment```
