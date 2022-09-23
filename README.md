@@ -30,3 +30,6 @@ Append ```TERMINAL=kitty``` to ```/etc/environment```
 
 ### Theme
 I created a script that automatically changes the theme from a bunch of programs. It's very, **very** barebones script. I made some themes, using base16 and themes avaiable on Arch repos and the AUR. Run ```sunset``` and check how to use it. I made a 2nd script, evev more barebones in python, that it's sole purpose is to be a icon on the system tray. It can change between a light and a dark theme. Right now, it can change the theme based on the time of the day but is just 2 lines of code and I need to come up with a better solution.
+
+### Dunst
+Dunst config file is automatically made everytime ```sunset``` is used, so be careful, any change is going to be erased. If a change is needed, then change at ```gendunst```, inside ```sunset``` folder.
