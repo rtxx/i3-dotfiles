@@ -1,0 +1,27 @@
+#!/usr/bin/env bash
+
+case "$1" in
+    performance)
+        cpupower frequency-set -g performance
+        ;;
+    powersave)
+        cpupower frequency-set -g powersave
+        ;;
+    userspace)
+        cpupower frequency-set -g userspace
+        ;;
+    ondemand)
+        cpupower frequency-set -g ondemand
+        ;;
+    conservative)
+        cpupower frequency-set -g conservative
+        ;;
+    schedutil)
+        cpupower frequency-set -g schedutil
+        ;;
+    *)
+        echo "Usage: $0 [performance|powersave|userspace|ondemand|conservative|schedutil]"
+        exit 2
+esac
+
+exit 0 

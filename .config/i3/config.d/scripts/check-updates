@@ -1,0 +1,143 @@
+#!/usr/bin/sh
+#
+# simple script to check for arch updates. uses 'checkupdates' from pacman-contrib
+
+progname=$(basename $0)
+
+# check if dependencies are met
+dependencies=("pacman-contrib" "yay")
+for pkg in ${dependencies[@]}; do
+  checkDependency=$(pacman -Q $pkg)
+  exitStatus=$?
+  if [ "$exitStatus" -eq 1 ]; then
+    notify-send "Error !" "Please install '$pkg' to check for updates"
+    echo "Error ! Please install '$pkg'"
+    exit 2
+  fi
+done
+
+function printHelp {
+cat << HEREDOC
+
+   Usage: $progname [-b, --i3bar] [-n, --no-osd] [-naur, --no-aur]
+
+   Checks for Arch updates, including AUR.
+   Displays a simple desktop notification via 'notify-send'.
+   Uses 'yay' for AUR updates.
+
+   optional arguments:
+     -h, --help             show this help message and exit
+     -b, --i3bar            outputs only "SYS AUR", useful for i3bar
+     -n, --no-osd           run without desktop notifications
+     -naur, --no-aur        dont check for AUR updates
+
+HEREDOC
+}
+
+# As long as there is at least one more argument, keep looping
+while [[ $# -gt 0 ]]; do
+  key="$1"
+  case "$key" in
+    -h|--help) printHelp=1 ;;
+    -b|--i3bar) userI3Bar=1 ;;
+    -n|--no-osd) noOSD=1 ;;
+    -naur|--no-aur) noAUR=1 ;;
+    *) echo "Unknown option '$key'." ; printHelp ; exit 2 ;;
+  esac
+  shift
+done
+
+if [ "$printHelp" ]; then
+  printHelp
+  exit 0
+fi
+
+if [ ! "$noOSD" ]; then
+  notify-send -t 750 "Getting Updates..."
+fi
+
+if [ ! "$userI3Bar" ]; then
+  echo "Getting Updates..."
+fi
+
+updates () {
+  updates=$(checkupdates)
+  updatesExitStatus=$?
+  if [ "$updatesExitStatus" -eq 0 ]; then
+    updatesNumber=$(checkupdates | wc -l)
+
+    if [ ! "$noOSD" ]; then
+      notify-send "Updates Available" "Total: $updatesNumber\n$updates"
+    fi
+
+    if [ ! "$userI3Bar" ]; then
+      echo "Updates Available, Total: $updatesNumber"
+      echo "$updates"
+    fi
+
+    outputI3BarString="SYS"
+    updatesExit=0
+  else
+    if [ ! "$noOSD" ]; then
+      notify-send "No Updates Available" ""
+    fi
+
+    if [ ! "$userI3Bar" ]; then
+      echo "No Updates Available."
+    fi
+    updatesExit=2
+  fi
+}
+
+updatesAUR () {
+  updatesAUR=$(yay -Qau)
+  updatesNumberAUR=$(yay -Qau | wc -l)
+  if [ "$updatesNumberAUR" -gt 0 ]; then
+
+    if [ ! "$noOSD" ]; then
+      notify-send "AUR Updates Available" "Total: $updatesNumberAUR\n$updatesAUR"
+    fi
+
+    if [ ! "$userI3Bar" ]; then
+      echo "AUR Updates Available, Total: $updatesNumberAUR"
+      echo "$updatesAUR"
+    fi
+
+    outputI3BarString=$outputI3BarString" AUR"
+    updatesAURExit=0
+  else
+    if [ ! "$noOSD" ]; then
+      notify-send "No AUR Updates Available" ""
+    fi
+    if [ ! "$userI3Bar" ]; then
+      echo "No AUR Updates Available."
+    fi
+    updatesAURExit=2
+  fi
+}
+
+updates
+if [ ! "$noAUR" ]; then
+  updatesAUR
+else
+  # so it wont error's out on the end
+  updatesAURExit=0
+fi
+
+
+if [ "$userI3Bar" ]; then
+  if [ "$outputI3BarString" ]; then
+    echo "$outputI3BarString"
+    exit 0
+  else
+    echo "No Updates Available."
+    exit 0
+  fi
+fi
+
+if [ "$updatesExit" -eq 0 ] || [ "$updatesAURExit" -eq 0 ]; then
+  exit 0
+else
+  exit 2
+fi
+

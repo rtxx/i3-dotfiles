@@ -1,0 +1,17 @@
+#!/bin/bash
+
+echo "Pacman CheatSheet"
+echo "> Online"
+echo "  pacman -Syu    - Search and updates system."
+echo "  pacman -S [x]  - Install [x]."
+echo "  pacman -Si [x] - Search online for [x] with details."
+echo
+echo "> Search localy pkg's"
+echo "  pacman -Qi [x] - Search localy for [x] with details."
+echo "  pacman -Qo [x] - Gets [x] package name."
+echo
+echo "> Removing pkg's"
+echo "  pacman -R [x]   - Removes [x] from system."
+echo "  pacman -Rsc [x] - Removes [x] from system and unneeded dependencies."
+echo "  pacman -Qdt     - List unneeded packages with versions."
+echo "  pacman -Rns \$(pacman -Qdtq) - Removes unneeded packages (recursive)."

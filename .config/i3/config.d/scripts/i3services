@@ -1,0 +1,187 @@
+#!/usr/bin/env bash
+
+# Notifications time on screen
+OSD_TIME=3000
+
+# Notifications title
+OSD_TITLE="Services"
+
+SVC_ON=
+SVC_OFF=
+
+# start services for print support
+start_print_services () { 
+  if (systemctl -q is-active avahi-daemon.service) then
+    echo "avahi is running, ignoring..."
+    notify-send -t $OSD_TIME $OSD_TITLE "Avahi is running, ignoring..."
+  else
+    systemctl start avahi-daemon.service
+    echo "avahi started."
+    notify-send -t $OSD_TIME $OSD_TITLE "Avahi started."
+  fi
+
+  if (systemctl -q is-active cups.service) then
+    echo "CUPS is running, ignoring..."
+    notify-send -t $OSD_TIME $OSD_TITLE "CUPS is running, ignoring..."
+  else
+    systemctl start cups.service
+    echo "CUPS started."
+    notify-send -t $OSD_TIME $OSD_TITLE "CUPS started."
+  fi
+}
+
+# start services for bluetooth support
+start_bluetooth_services () {
+  if (systemctl -q is-active bluetooth) then
+    echo "bluetooth is running, ignoring..."
+    notify-send -t $OSD_TIME $OSD_TITLE "Bluetooth is running, ignoring..."
+  else
+    systemctl start bluetooth
+    echo "Bluetooth started."
+    notify-send -t $OSD_TIME $OSD_TITLE "Bluetooth started."
+  fi
+}
+
+# start services for energy support
+start_energy_services () { 
+  if (systemctl -q is-active tlp.service) then
+    echo "tlp is running, ignoring..."
+    notify-send -t $OSD_TIME $OSD_TITLE "tlp is running, ignoring..."
+  else
+    systemctl start tlp.service
+    echo "tlp started."
+    notify-send -t $OSD_TIME $OSD_TITLE "tlp started."
+  fi
+
+  if (systemctl -q is-active cpupower.service) then
+    echo "cpupower is running, ignoring..."
+    notify-send -t $OSD_TIME $OSD_TITLE "cpupower is running, ignoring..."
+  else
+    systemctl start cpupower.service
+    echo "cpupower started."
+    notify-send -t $OSD_TIME $OSD_TITLE "cpupower started."
+  fi
+}
+
+# stop services for print support
+stop_print_services () { 
+  if (systemctl -q is-active avahi-daemon.service) then
+    systemctl stop avahi-daemon.service
+    echo "avahi is stopping..."
+    notify-send -t $OSD_TIME $OSD_TITLE "Avahi is stopping..."
+  else
+    echo "avahi not running, ignoring..."
+    notify-send -t $OSD_TIME $OSD_TITLE "Avahi not running, ignoring..."
+  fi
+
+  if (systemctl -q is-active cups.service) then
+    systemctl stop cups.service
+    echo "CUPS is stopping..."
+    notify-send -t $OSD_TIME $OSD_TITLE "CUPS is stopping..."
+  else
+    echo "CUPS not running, ignoring..."
+    notify-send -t $OSD_TIME $OSD_TITLE "CUPS not running, ignoring..."
+  fi
+}
+
+# stop services for bluetooth support
+stop_bluetooth_services () {
+  if (systemctl -q is-active bluetooth) then
+    systemctl stop bluetooth.service
+    echo "bluetooth is stopping..."
+    notify-send -t $OSD_TIME $OSD_TITLE "Bluetooth is stopping..."
+  else
+    echo "Bluetooth not running, ignoring..."
+    notify-send -t $OSD_TIME $$OSD_TITLE "Bluetooth not running, ignoring..."
+  fi
+}
+
+# stop services for energy support
+stop_energy_services () { 
+  if (systemctl -q is-active tlp.service) then
+    systemctl stop tlp.service
+    echo "tlp is stopping..."
+    notify-send -t $OSD_TIME $OSD_TITLE "tlp is stopping..."
+  else
+    echo "tlp not running, ignoring..."
+    notify-send -t $OSD_TIME $OSD_TITLE "tlp not running, ignoring..."
+  fi
+
+  if (systemctl -q is-active cpupower.service) then
+    systemctl stop cpupower.service
+    echo "cpupower is stopping..."
+    notify-send -t $OSD_TIME $OSD_TITLE "cpupower is stopping..."
+  else
+    echo "cpupower not running, ignoring..."
+    notify-send -t $OSD_TIME $OSD_TITLE "cpupower not running, ignoring..."
+  fi
+}
+
+check_services () {
+  # check services for print support 
+  if (systemctl -q is-active avahi-daemon.service) then
+    SVC_ON="${SVC_ON} avahi\n"
+  else
+    SVC_OFF="${SVC_OFF} avahi\n"
+  fi
+
+  if (systemctl -q is-active cups.service) then
+    SVC_ON="${SVC_ON} cups\n"
+  else
+    SVC_OFF="${SVC_OFF} cups\n"
+  fi
+
+  # check services for bluetooth support 
+  if (systemctl -q is-active bluetooth.service) then
+    SVC_ON="${SVC_ON} bluetooth\n"
+  else
+    SVC_OFF="${SVC_OFF} bluetooth\n"
+  fi
+
+  # check services for battery support 
+  if (systemctl -q is-active tlp.service) then
+    SVC_ON="${SVC_ON} tlp\n"
+  else
+    SVC_OFF="${SVC_OFF} tlp\n"
+  fi
+
+  if (systemctl -q is-active cpupower.service) then
+    SVC_ON="${SVC_ON} cpupower\n"
+  else
+    SVC_OFF="${SVC_OFF} cpupower\n"
+  fi
+
+  notify-send -t 5000 "Online services" "$SVC_ON"
+  notify-send -t 5000 "Offline services" "$SVC_OFF"
+  echo -e "online services:\n$SVC_ON"
+  echo -e "offline services:\n$SVC_OFF"
+}
+
+case "$1" in
+    check)
+        check_services
+        ;;
+    start-printing)
+        start_print_services
+        ;;
+    start-bluetooth)
+        start_bluetooth_services
+        ;;
+    start-energy)
+        start_energy_services
+        ;;
+    stop-printing)
+        stop_print_services
+        ;;
+    stop-bluetooth)
+        stop_bluetooth_services
+        ;;
+    stop-energy)
+        stop_energy_services
+        ;;
+    *)
+        echo "Usage: $0 [check | start-printing | start-bluetooth | start-energy | stop-printing | stop-bluetooth | stop-energy]"
+        exit 2
+esac
+
+exit 0 

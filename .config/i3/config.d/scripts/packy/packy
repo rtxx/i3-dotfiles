@@ -1,0 +1,907 @@
+#!/usr/bin/env bash
+
+#TODO
+# Search
+#   - Search for packages - X
+#   - Search for specific packages - X
+# Download
+#   - Dowload package -
+# Install
+#   - Auto install make depends - X
+#   - Auto install depends - X
+# Update
+#   - Check for updates - X
+#   - Auto updates packages with updates - X
+
+#   BEWARE!
+#   * There is alot of *badness* in this script, I made it for fun and to learn and to get used to bash.
+#   Get's AUR pkgs.
+#   More info at https://wiki.archlinux.org/title/Aurweb_RPC_interface
+#   Functionality:
+#   -> Search
+#       By default, search package and install it.
+#       -S can be used with the -f flag to narrow the search, it search for the specific field. check the wiki for more info
+#       -S can also be used with -s (lowercase) and gets the top 10 results, can be more with the -r flag
+#   -> Updates
+#       the -U flag check for new updates on AUR and asks to update them
+
+# set start program time
+readonly PROGSTARTTIME="$(date)"
+
+#set -o errexit
+#set -o nounset
+#set -o pipefail
+
+# get the name of the script from its file name
+readonly PROGNAME=$(basename $0)
+
+# get argurments
+#readonly ARGS=$@
+
+# get script dir
+# https://stackoverflow.com/a/246128
+readonly PROGDIR="$( cd -- "$( dirname -- "${BASH_SOURCE[0]}" )" &> /dev/null && pwd )"
+
+# set log file
+readonly PROGLOG="${PROGDIR}/$PROGNAME.log"
+# activates log file
+readonly LOGTOFILE=1
+
+# max results to show on search
+readonly SEARCH_MAXRESULTS=10
+
+# default download location
+readonly DOWNLOADLOCATION=${PROGDIR}"/pkgs"
+
+# default pkgList temp file
+readonly PKGLIST="/tmp/pkgList"
+
+printHelp() {
+cat << HELPME
+Usage: ${PROGNAME} -options [package]
+
+Get's AUR packages. It can search and check for updates.
+Uses AUR API. More info at https://wiki.archlinux.org/title/Aurweb_RPC_interface
+
+Options:
+  -h        show this help message and exit
+  Search:
+    -S      search for package and install it
+      -s      search for keyword and gets (by default) ${SEARCH_MAXRESULTS} results, in order, by number of votes
+      -r      max result on search, default is ${SEARCH_MAXRESULTS}
+      -f      search with specific field. avaiable fields:
+              "name" "name-desc" "maintainer" "depends" "makedepends" "optdepends" "checkdepends"
+  Update:
+    -U      check for AUR packages updates and updates them
+
+HELPME
+}
+
+# color support, thanks https://gist.github.com/elucify/c7ccfee9f13b42f11f81
+RESTORE=$(echo -en '\033[0m')
+RED=$(echo -en '\033[00;31m')
+GREEN=$(echo -en '\033[00;32m')
+YELLOW=$(echo -en '\033[00;33m')
+BLUE=$(echo -en '\033[00;34m')
+MAGENTA=$(echo -en '\033[00;35m')
+PURPLE=$(echo -en '\033[00;35m')
+CYAN=$(echo -en '\033[00;36m')
+LIGHTGRAY=$(echo -en '\033[00;37m')
+LRED=$(echo -en '\033[01;31m')
+LGREEN=$(echo -en '\033[01;32m')
+LYELLOW=$(echo -en '\033[01;33m')
+LBLUE=$(echo -en '\033[01;34m')
+LMAGENTA=$(echo -en '\033[01;35m')
+LPURPLE=$(echo -en '\033[01;35m')
+LCYAN=$(echo -en '\033[01;36m')
+WHITE=$(echo -en '\033[01;37m')
+BOLD=$(echo -en '\033[1m')
+UNDERLINE=$(echo -en '\033[4')
+
+# exit code function
+# exit the script with a custom exit code
+# exitCode code_error verbose text_to_show
+#   code_error
+#     0...n : exit error code
+#   verbose
+#     1 : if on, then outputs to the screen the description of the exit code
+#   text_to_show
+#     text : custom text to show with the exit code
+exitCode() {
+  local exitCodeList
+  exitCodeList[0]="[Info]: Complete with no errors."
+  #exitCodeList[1]="Bash reserved: Catchall for general errors"
+  #exitCodeList[2]="Bash reserved: Misuse of shell builtins"
+  exitCodeList[3]="[Error]: ${3}"
+  exitCodeList[4]="[Error]: Unknown option: '${3}' (use -h for help)"
+  exitCodeList[5]="[Error]: Dependency not installed: '${3}'"
+  exitCodeList[6]="[Info]: ${3}"
+
+  # loops the exit code list
+  for i in "${!exitCodeList[@]}"; do
+    if [[ "$1" == "$i" ]]; then
+      # checks if verbose flag is active, if so echo the error description
+      if [[ "$2" == "1" ]]; then
+        echo ${BOLD}${exitCodeList[${i}]}${RESTORE}
+      fi
+      # calculates script runtime
+      local startTime=$(date --date "${PROGSTARTTIME}" -u +%s)
+      local endTime=$(date --utc +%s)
+      local elapsedTime=$((${endTime}-${startTime}))
+
+      # logs description and type of exit code
+      logMe 3 "${exitCodeList[${i}]} [${i}]"
+      logMe "End at $(date +"%Y/%m/%d %H:%M:%S"). Runtime: ${elapsedTime}s."
+      # exists with the error code 'i'
+      exit $i
+    fi
+  done
+}
+
+# log function
+# logs simple text to log file PROGLOG
+# logMe type_of_log_msg msg outputs_to_screen
+#   type_of_log_msg
+#     0 : Info
+#     1 : Error
+#     2 : Warning
+#     3 : Freehand
+#   msg
+#     text
+#   outputs_to_screen
+#     1 : if on, outputs text to the screen
+logMe() {
+  # if no argument is given, then log to file a info text
+  if [[ $# -eq 1 ]]; then
+    if [[ "$LOGTOFILE" == 1 ]]; then echo -e "[Info]: $*" >> ${PROGLOG} ; fi
+  fi
+
+  # log type : info
+  if [[ "$1" == "0" ]]; then
+    if [[ "$LOGTOFILE" == 1 ]]; then echo -e "[Info]: $2" >> ${PROGLOG} ; fi
+    if [[ "$3" == "1" ]]; then echo -e "${BLUE}${BOLD}::${RESTORE} $2" ; fi
+  fi
+
+  # log type : error
+  if [[ "$1" == "1" ]]; then
+    if [[ "$LOGTOFILE" == 1 ]]; then echo -e "[ERROR]: $2" >> ${PROGLOG} ; fi
+    if [[ "$3" == "1" ]]; then echo -e "${RED}${BOLD}::${RESTORE} $2" ; fi
+  fi
+
+  # log type : warning
+  if [[ "$1" == "2" ]]; then
+    if [[ "$LOGTOFILE" == 1 ]]; then echo -e "[Warning]: $2" >> ${PROGLOG} ; fi
+    if [[ "$3" == "1" ]]; then echo -e "${YELLOW}${BOLD}::${RESTORE} $2" ; fi
+  fi
+
+  # log type : freehand
+  if [[ "$1" == "3" ]]; then
+    if [[ "$LOGTOFILE" == 1 ]]; then echo -e "$2" >> ${PROGLOG} ; fi
+    if [[ "$3" == "1" ]]; then echo -e "$2" ; fi
+  fi
+}
+
+# check if dependencies are met
+checkDependencies() {
+  dependencies=("sudo" "pkexec" "curl" "jq")
+  for pkg in ${dependencies[@]}; do
+    checkDependency=$(pacman -Q $pkg 2>&1)
+    exitStatus=$?
+    if [ "$exitStatus" -eq 1 ]; then
+      logMe 1 "Dependency not installed: '${pkg}'"
+      exitCode 5 1 "${pkg}"
+    fi
+  done
+}
+
+logMe "Start at $(date --date "${PROGSTARTTIME}" +"%Y/%m/%d %H:%M:%S")"
+
+# prints help if no argument is present
+if [[ $# -eq 0 ]]; then
+  printHelp
+  exitCode 0
+fi
+
+# clean temporary files on exit
+if [[ -e "${PKGLIST}" ]]; then
+  trap "rm ${PKGLIST}" EXIT
+fi
+
+# trying to make my own argument parser
+# can mix arguments like -ab and -ca
+# but long options must be on a diferent case
+# how does it work
+# it checks if the char in the argument string as a hiffen '-'
+# if it detects a hiffen '-' then it checks for the next char after
+# if it detects a hiffen '-' again then its a long option
+# if not its a short option
+# needs some testing
+
+while [[ $# -gt 0 ]]; do
+
+  # detects if the 1st char is an hiffen
+  detectArgChar="$(printf '%s' "$1" | cut -c1)"
+  if [ "${detectArgChar}" = - ]; then
+    # saves the current argument string and its values
+    currentArgOptions=$1
+    currentArgValue=$2
+
+    # detects if the 2nd char is an hiffen
+    detectDoubleArgChar="$(printf '%s' "${currentArgOptions:1}" | cut -c1)"
+
+    # if the next char is '-' then we got a long option
+    if [ "${detectDoubleArgChar}" = - ]; then
+
+      # key is current_argument_string - 2 char , ie '--help' turns 'help'
+      key=${currentArgOptions:2}
+      # compares if the currentArgOptions is the character from the case
+      case "${key}" in
+        # help flag
+        help) shift; printHelp=1 ;;
+        search) shift; searchPkg="${currentArgValue}" ; searchPkgF=1 ;;
+
+        *) exitCode 4 1 "${key}" ;;
+      esac
+      #shifts to the next argument
+      shift
+    # if the char is not '-' then it's a short argument
+    else
+      # gets number of arguments
+      totalCharString=(${#currentArgOptions})
+
+      # start on '1' because its always '-'
+      for ((i = 1 ; i < ${totalCharString}  ; i++)); do
+        # the current argument is: current_argument_string - postion_on_argument_string - 1
+        # ie, if we have a string -abcd then it will got like this
+        # loop 1 : gets 'a' because i=1, i<4, -abcd:1:1 = a
+        # loop 2 : gets 'b' because i=2, i<4, -abcd:2:1 = b
+        # loop 3 : gets 'c' because i=3, i<4, -abcd:3:1 = c
+        # loop 4 : gets 'd' because i=4, i<4, -abcd:4:1 = d
+        key=${currentArgOptions:$i:1}
+
+        # compares if the currentArgOptions is the character from the case
+        case "${key}" in
+          # help flag
+          h) shift; printHelp=1 ;;
+
+          S) shift; searchPkg="${currentArgValue}" ; searchPkgF=1;;
+          s) searchPkgListF=1;;
+          r) shift; maxResults="${currentArgValue}" ; maxResultsF=1;;
+          i) shift; searchInfoF=1;;
+          f) shift; searchField="${currentArgValue}" ; searchFieldF=1 ;;
+          U) shift; checkUpdatesF=1 ;;
+
+          *) exitCode 4 1 "${key}";;
+        esac
+
+      done
+      #shifts to the next argument
+      shift
+    fi
+  fi
+done
+
+# search function
+search() {
+
+  # stores packge name
+  local pkgString=${1}
+  if [[ "$searchFieldF" ]]; then
+    searchFieldOptions=("name" "name-desc" "maintainer" "depends" "makedepends" "optdepends" "checkdepends")
+    for field in ${searchFieldOptions[@]}; do
+      if [ "${field}" = "${searchField}" ]; then
+        foundField=1
+      fi
+    done
+    if [[ ! "$foundField" ]]; then
+      logMe 2 "'${searchField}' is not a valid search field, ignoring..." 1
+    fi
+  fi
+
+  if [ "${searchPkgListF}" ]; then
+
+    # donwloads the packge JSON from AUR api. if field option is on, uses different link
+    if [[ "$foundField" ]]; then
+      logMe 0 "Using '${searchField}' as a search field" 1
+      donwloadJSON=$(curl -s "https://aur.archlinux.org/rpc/?v=5&type=search&by=$searchField&arg=$pkgString" -o ${PKGLIST})
+    else
+      donwloadJSON=$(curl -s "https://aur.archlinux.org/rpc/?v=5&type=search&arg=$pkgString" -o ${PKGLIST})
+    fi
+    # loads resulting JSON into a var
+    resultJSON=$(cat ${PKGLIST})
+    # gets number of hit results
+    nResult=$(echo $resultJSON | jq -r '.resultcount')
+
+    if [[ ${nResult} -gt 0 ]]; then
+      if [ ! "${maxResultsF}" ]; then
+        local maxResults=$SEARCH_MAXRESULTS
+      fi
+
+      # if there is less then 10 results then maxResults get the value of nResult
+      if [[ "$nResult" -lt $maxResults ]]; then
+        maxResults=$nResult
+      fi
+
+      echo "${GREEN}${BOLD}::${RESTORE} Found $nResult packages."
+      # this is to sort by number of votes, meaning that probably the package needed is at the top
+      resultJSON=$(cat ${PKGLIST} | jq -jr '.results | sort_by(.NumVotes) | reverse')
+      printf "${BOLD}%-4s %-32s %-128s${RESTORE}\n" "[#]" "Package Name" "Description" #| sed 's/^/   /'
+      for ((i = 0 ; i < $maxResults; i++)); do
+        name=$(echo $resultJSON | jq -jr '.['$i'] | "\(.Name)"')
+        description=$(echo $resultJSON | jq -jr '.['$i'] | "\(.Description)"')
+        printf "%-4s ${BOLD}%-32s${RESTORE} %-128s\n" "[$i]" "$name" "$description" #| sed 's/^/   /'
+      done
+
+      logMe 0 "Done." 1
+      exitCode 0
+    else
+      logMe 0 "0 results for '${pkgString}'. " 1
+      exitCode 0
+    fi
+  fi
+
+  # donwloads the packge JSON from AUR api
+  local donwloadJSON=$(curl -s "https://aur.archlinux.org/rpc/?v=5&type=info&arg[]=${pkgString}" -o ${PKGLIST})
+  # loads resulting JSON into a var
+  local resultJSON=$(cat ${PKGLIST})
+  # gets number of hit results
+  local nResult=$(echo $resultJSON | jq -r '.resultcount')
+
+  if [[ ${nResult} -eq 0 ]]; then
+    logMe 0 "0 results for '${pkgString}'. " 1
+    exitCode 0
+  # if there's exactly 1 result, then shows info, downloads packages, and instals it
+  elif [[ ${nResult} -eq 1 ]]; then
+
+    # if the 'i' flag is on, shows info then exits
+    # if not, proceeds to install
+    if [[ ${2} == "info" ]]; then
+      # loads results from JSON to separated vars
+      local id=$(echo $resultJSON | jq -jr '.results[] | "\(.ID)"')
+      local name=$(echo $resultJSON | jq -jr '.results[] | "\(.Name)"')
+      local baseId=$(echo $resultJSON | jq -jr '.results[] | "\(.PackageBaseID)"')
+      local base=$(echo $resultJSON | jq -jr '.results[] | "\(.PackageBase)"')
+      local version=$(echo $resultJSON | jq -jr '.results[] | "\(.Version)"')
+      local description=$(echo $resultJSON | jq -jr '.results[] | "\(.Description)"')
+      local url=$(echo $resultJSON | jq -jr '.results[] | "\(.URL)"')
+      local numVotes=$(echo $resultJSON | jq -jr '.results[] | "\(.NumVotes)"')
+      local popularity=$(echo $resultJSON | jq -jr '.results[] | "\(.Popularity)"')
+      local outOfDate=$(echo $resultJSON | jq -jr '.results[] | "\(.OutOfDate)"')
+      # check if out of date is null. if value is null, then package is up-to-date
+      if [ ! "${outOfDate}" == "null" ]; then
+        outOfDate=$(date -d@${outOfDate})
+        outOfDate="${MAGENTA}Flagged out of date since $outOfDate ${RESTORE}"
+      else
+        outOfDate="no"
+      fi
+
+      #local maintainer=$(echo $resultJSON | jq -jr '.results[] | "\(.Maintainer)"')
+      # check if package got a maintainer, if its not orphan
+      maintainer=$(echo $resultJSON | jq -jr '.results[] | "\(.Maintainer)"')
+      if [ "$maintainer" == "null" ]; then
+        maintainer="${BLUE}Package is orphan. ${RESTORE}"
+      fi
+
+      #local firstSubmitted=$(echo $resultJSON | jq -jr '.results[] | "\(.FirstSubmitted)"')
+      local firstSubmitted=$(date -d @$(echo $resultJSON | jq -jr '.results[] | "\(.FirstSubmitted)"'))
+
+      #local lastModified=$(echo $resultJSON | jq -jr '.results[] | "\(.LastModified)"')
+      local lastModified=$(date -d @$(echo $resultJSON | jq -jr '.results[] | "\(.LastModified)"'))
+
+      local urlPath=$(echo $resultJSON | jq -jr '.results[] | "\(.URLPath)"')
+      local depends=$(echo $resultJSON | jq -jr '.results[] | "\(.Depends)"')
+      local makeDepends=$(echo $resultJSON | jq -jr '.results[] | "\(.MakeDepends)"')
+      if [[ ${makeDepends} == "null" ]]; then makeDepends="none"; fi
+      local optDepends=$(echo $resultJSON | jq -jr '.results[] | "\(.OptDepends)"')
+      if [[ ${optDepends} == "null" ]]; then optDepends="none"; fi
+      local license=$(echo $resultJSON | jq -jr '.results[] | "\(.License)"')
+      local keywords=$(echo $resultJSON | jq -jr '.results[] | "\(.Keywords)"')
+
+      printf "\e[1m%-16s %-2s\e[0m %-16s\n" "ID" ":" "$id"
+      printf "\e[1m%-16s %-2s\e[0m %-16s\n" "Name" ":" "$name"
+      printf "\e[1m%-16s %-2s\e[0m %-16s\n" "Base ID" ":" "$baseId"
+      printf "\e[1m%-16s %-2s\e[0m %-16s\n" "Base Name" ":" "$base"
+      printf "\e[1m%-16s %-2s\e[0m %-16s\n" "Version" ":" "$version"
+      printf "\e[1m%-16s %-2s\e[0m %-16s\n" "Description" ":" "$description"
+      printf "\e[1m%-16s %-2s\e[0m %-16s\n" "URL" ":" "$url"
+      printf "\e[1m%-16s %-2s\e[0m %-16s\n" "Votes" ":" "$numVotes"
+      printf "\e[1m%-16s %-2s\e[0m %-16s\n" "Popularity" ":" "$popularity"
+      printf "\e[1m%-16s %-2s\e[0m %-16s\n" "Out of date" ":" "$outOfDate"
+      printf "\e[1m%-16s %-2s\e[0m %-16s\n" "Maintainer" ":" "$maintainer"
+      printf "\e[1m%-16s %-2s\e[0m %-16s\n" "First Submitted" ":" "$firstSubmitted"
+      printf "\e[1m%-16s %-2s\e[0m %-16s\n" "Last Modified" ":" "$lastModified"
+      printf "\e[1m%-16s %-2s\e[0m %-16s\n" "AUR URL" ":" "$urlPath"
+      printf "\e[1m%-16s %-2s\e[0m %-16s\n" "Depends" ":" "$depends"
+      printf "\e[1m%-16s %-2s\e[0m %-16s\n" "Make Depends" ":" "$makeDepends"
+      printf "\e[1m%-16s %-2s\e[0m %-16s\n" "Optional Depends" ":" "$optDepends"
+      printf "\e[1m%-16s %-2s\e[0m %-16s\n" "License" ":" "$license"
+      printf "\e[1m%-16s %-2s\e[0m %-16s\n" "Keywords" ":" "$keywords"
+      exitCode 0 1 "Done."
+    else
+      installPkg $pkgString 1
+      exitCode 0
+    fi
+  fi
+}
+
+installPkg() {
+
+  # stores packge name
+  local pkgString=${1}
+  # if 2nd argument is '1', then it will explicitly install the package, as a 'main package', if its empty then it will install as a dependency
+  local mainPkg=${2}
+  # donwloads the packge JSON from AUR api
+  local donwloadJSON=$(curl -s "https://aur.archlinux.org/rpc/?v=5&type=info&arg[]=${pkgString}" -o ${PKGLIST})
+  # loads resulting JSON into a var
+  local resultJSON=$(cat ${PKGLIST})
+
+  # loads results from JSON to separated vars
+  local id=$(echo $resultJSON | jq -jr '.results[] | "\(.ID)"')
+  local name=$(echo $resultJSON | jq -jr '.results[] | "\(.Name)"')
+  local baseId=$(echo $resultJSON | jq -jr '.results[] | "\(.PackageBaseID)"')
+  local base=$(echo $resultJSON | jq -jr '.results[] | "\(.PackageBase)"')
+  local version=$(echo $resultJSON | jq -jr '.results[] | "\(.Version)"')
+  local description=$(echo $resultJSON | jq -jr '.results[] | "\(.Description)"')
+  local url=$(echo $resultJSON | jq -jr '.results[] | "\(.URL)"')
+  local numVotes=$(echo $resultJSON | jq -jr '.results[] | "\(.NumVotes)"')
+  local popularity=$(echo $resultJSON | jq -jr '.results[] | "\(.Popularity)"')
+
+  local outOfDate=$(echo $resultJSON | jq -jr '.results[] | "\(.OutOfDate)"')
+  # check if out of date is null. if value is null, then package is up-to-date
+  if [ ! "${outOfDate}" == "null" ]; then
+    outOfDate=$(date -d@${outOfDate})
+    outOfDate="${MAGENTA}Flagged out of date since $outOfDate ${RESTORE}"
+  else
+    outOfDate="no"
+  fi
+
+  #local maintainer=$(echo $resultJSON | jq -jr '.results[] | "\(.Maintainer)"')
+  # check if package got a maintainer, if its not orphan
+  local maintainer=$(echo $resultJSON | jq -jr '.results[] | "\(.Maintainer)"')
+  if [ "$maintainer" == "null" ]; then
+    maintainer="${BLUE}Package is orphan ${RESTORE}"
+  fi
+
+  #local firstSubmitted=$(echo $resultJSON | jq -jr '.results[] | "\(.FirstSubmitted)"')
+  local firstSubmitted=$(date -d @$(echo $resultJSON | jq -jr '.results[] | "\(.FirstSubmitted)"'))
+
+  #local lastModified=$(echo $resultJSON | jq -jr '.results[] | "\(.LastModified)"')
+  local lastModified=$(date -d @$(echo $resultJSON | jq -jr '.results[] | "\(.LastModified)"'))
+
+  local urlPath=$(echo $resultJSON | jq -jr '.results[] | "\(.URLPath)"')
+  local depends=$(echo $resultJSON | jq -jr '.results[] | "\(.Depends)"')
+  if [[ ${depends} == "null" ]]; then depends="none"; fi
+  local makeDepends=$(echo $resultJSON | jq -jr '.results[] | "\(.MakeDepends)"')
+  if [[ ${makeDepends} == "null" ]]; then makeDepends="none"; fi
+  local optDepends=$(echo $resultJSON | jq -jr '.results[] | "\(.OptDepends)"')
+  if [[ ${optDepends} == "null" ]]; then optDepends="none"; fi
+  local license=$(echo $resultJSON | jq -jr '.results[] | "\(.License)"')
+  local keywords=$(echo $resultJSON | jq -jr '.results[] | "\(.Keywords)"')
+
+  #printf "\e[1m%-16s %-2s\e[0m %-16s\n" "ID" ":" "$id"
+  printf "\e[1m%-16s %-2s\e[0m %-16s\n" "Name" ":" "$name"
+  #printf "\e[1m%-16s %-2s\e[0m %-16s\n" "Base ID" ":" "$baseId"
+  #printf "\e[1m%-16s %-2s\e[0m %-16s\n" "Base Name" ":" "$base"
+  printf "\e[1m%-16s %-2s\e[0m %-16s\n" "Version" ":" "$version"
+  printf "\e[1m%-16s %-2s\e[0m %-16s\n" "Description" ":" "$description"
+  #printf "\e[1m%-16s %-2s\e[0m %-16s\n" "URL" ":" "$url"
+  #printf "\e[1m%-16s %-2s\e[0m %-16s\n" "Votes" ":" "$numVotes"
+  #printf "\e[1m%-16s %-2s\e[0m %-16s\n" "Popularity" ":" "$popularity"
+  #printf "\e[1m%-16s %-2s\e[0m %-16s\n" "Out of date" ":" "$outOfDate"
+  #printf "\e[1m%-16s %-2s\e[0m %-16s\n" "Maintainer" ":" "$maintainer"
+  #printf "\e[1m%-16s %-2s\e[0m %-16s\n" "First Submitted" ":" "$firstSubmitted"
+  #printf "\e[1m%-16s %-2s\e[0m %-16s\n" "Last Modified" ":" "$lastModified"
+  #printf "\e[1m%-16s %-2s\e[0m %-16s\n" "AUR URL" ":" "$urlPath"
+  #printf "\e[1m%-16s %-2s\e[0m %-16s\n" "Depends" ":" "$depends"
+  #printf "\e[1m%-16s %-2s\e[0m %-16s\n" "Make Depends" ":" "$makeDepends"
+  #printf "\e[1m%-16s %-2s\e[0m %-16s\n" "Optional Depends" ":" "$optDepends"
+  #printf "\e[1m%-16s %-2s\e[0m %-16s\n" "License" ":" "$license"
+  #printf "\e[1m%-16s %-2s\e[0m %-16s\n" "Keywords" ":" "$keywords"
+
+  logMe 0 "Checking for make dependencies for '$name' ..."
+
+  if [[ ! ${makeDepends} == "none" ]]; then
+    makeDepends=$(echo $resultJSON | jq -jr '.results[] | "\(.MakeDepends[]) "')
+    checkInstalledPkgs=$(pacman -Q ${makeDepends} 2>&1)
+    checkInstalledPkgsExitStatus=$?
+    if [ "${checkInstalledPkgsExitStatus}" -eq 0 ]; then
+      logMe 0 "All make dependencies are present" 1
+    else
+      logMe 2 "Some dependencies needed for compiling are missing:" 1
+
+      # gets total number of make dependencies
+      local nMakeDepends=$(echo $resultJSON | jq -r '.results[] | "\(.MakeDepends[])"' | wc -l)
+      # array of missing dependencies
+      local missingMakeDepends
+
+      # gets dependencies not installed
+      for ((i = 0 ; i < $nMakeDepends  ; i++)); do
+        pkg=$(echo $resultJSON | jq -r '.results[] | "\(.MakeDepends['"$i"'])"')
+
+        checkDependency=$(pacman -Q $pkg 2>&1); exitStatus=$?;
+        if [ "$exitStatus" -eq 1 ]; then
+          missingMakeDepends=("${missingMakeDepends[@]}" "${pkg}")
+          logMe 3 "Dependency not installed: '${pkg}'"
+        fi
+      done
+
+      # prints dependencies not installed
+      printf "\e[1m%-2s %-2s %-16s %-16s\e[0m\n" "[#]" "" "Package Name"
+      for ((i = 0 ; i < ${#missingMakeDepends[@]} ; i++)); do
+        local pkg=${missingMakeDepends[$i]}
+        printf "%-2s %-2s %-16s %-16s\n" "[$i]" "->" "${pkg}"
+      done
+
+      logMe 2 "packy will try to download and install them" 1
+
+      # loop to install dependencies
+      #for i in "${missingMakeDepends[@]}"; do
+      for ((i = 0 ; i < ${#missingMakeDepends[@]} ; i++)); do
+        local pkg=${missingMakeDepends[$i]}
+
+        # if package names has '>' on the name
+        # right now it removes it
+        # TODO: check for version
+        if [[ $pkg == *">"* ]]; then
+          logMe 2 "Known limitation: The current package '$pkg' has a version requirement. packy can NOT check for this." 1
+          logMe 2 "Please double check the version before installing." 1
+          local testversion=$pkg
+          pkg=${pkg%>*}
+          testversion=${testversion##*>}
+          char="$(printf '%s' "$testversion" | cut -c1)"
+          #echo "Version: $testversion"
+          #echo "char: $char"
+          #https://unix.stackexchange.com/a/327811
+          #pacman -Si go | grep -Po '^Version\s*: \K.+'
+        fi
+
+        local whileTitleString="${YELLOW}::${RESTORE} Now installing '$pkg' [$(($i+1))/${#missingMakeDepends[@]}].${BOLD} Continue? [y/n] : ${RESTORE}"
+        local whileErrorString="${RED}::${RESTORE} Error: Unknown option '$key'.${RESTORE}\n"
+        printf "${whileTitleString}"
+        while read key; do
+          case "$key" in
+            # if yes then continues the installation
+            y|yes) break ;;
+            n|no) exitCode 6 1 "Cancelled by user." ;;
+            *) printf  "${whileErrorString}" ; printf "${whileTitleString}" ;;
+          esac
+        done
+
+        printf "::${BOLD} Requesting root privilege  \n${RESTORE}"
+        sudo pacman -S "${pkg}" --asdeps ; exitStatus=$? ;
+        if [ "$exitStatus" -eq 1 ]; then
+          logMe 1 "pacman did not install '${pkg}'." 1
+
+          local whileTitleString="${BOLD}::${RESTORE} Should packy search the AUR? [y/n] : "
+          local whileErrorString="${RED}::${RESTORE} Error: Unknown option '$key'.${RESTORE}\n"
+          printf "${whileTitleString}"
+          while read key; do
+            case "$key" in
+              # if yes then continues the installation
+              y|yes) break ;;
+              n|no) exitCode 6 1 "Cancelled by user." ;;
+              *) printf  "${whileErrorString}" ; printf "${whileTitleString}" ;;
+            esac
+          done
+
+          logMe 0 "Recursive call for '${pkg}' "
+          installPkg ${pkg}
+
+        fi
+      done
+    fi
+
+  logMe 0 "Checking for dependencies for '$name' ..."
+
+  if [[ ! ${depends} == "none" ]]; then
+    depends=$(echo $resultJSON | jq -jr '.results[] | "\(.Depends[]) "')
+    checkInstalledPkgs=$(pacman -Q ${depends} 2>&1)
+    checkInstalledPkgsExitStatus=$?
+    if [ "${checkInstalledPkgsExitStatus}" -eq 0 ]; then
+      logMe 0 "All dependencies for running the package are present" 1
+    else
+      logMe 2 "Some dependencies needed for running the package are missing:" 1
+
+      # gets total number of dependencies
+      local nDepends=$(echo $resultJSON | jq -r '.results[] | "\(.Depends[])"' | wc -l)
+      # array of missing dependencies
+      local missingDepends
+
+      # gets dependencies not installed
+      for ((i = 0 ; i < $nDepends  ; i++)); do
+        pkg=$(echo $resultJSON | jq -r '.results[] | "\(.Depends['"$i"'])"')
+
+        checkDependency=$(pacman -Q $pkg 2>&1); exitStatus=$?;
+        if [ "$exitStatus" -eq 1 ]; then
+          missingDepends=("${missingDepends[@]}" "${pkg}")
+          logMe 3 "Dependency not installed: '${pkg}'"
+        fi
+      done
+
+      # prints dependencies not installed
+      printf "\e[1m%-2s %-2s %-16s %-16s\e[0m\n" "[#]" "" "Package Name"
+      for ((i = 0 ; i < ${#missingDepends[@]} ; i++)); do
+        local pkg=${missingDepends[$i]}
+        printf "%-2s %-2s %-16s %-16s\n" "[$i]" "->" "${pkg}"
+      done
+
+      logMe 2 "packy will try to download and install them" 1
+
+      # loop to install dependencies
+      for ((i = 0 ; i < ${#missingDepends[@]} ; i++)); do
+        local pkg=${missingDepends[$i]}
+
+        # if package names has '>' on the name
+        # right now it removes it
+        # TODO: check for version
+        if [[ $pkg == *">"* ]]; then
+          logMe 2 "Known limitation: The current package '$pkg' has a version requirement. packy can NOT check for this." 1
+          logMe 2 "Please double check the version before installing." 1
+          pkg=${pkg%>*}
+        fi
+
+        local whileTitleString="${YELLOW}::${RESTORE} Now installing '$pkg' [$(($i+1))/${#missingDepends[@]}].${BOLD} Continue? [y/n] : ${RESTORE}"
+        local whileErrorString="${RED}::${RESTORE} Error: Unknown option '$key'.${RESTORE}\n"
+        printf "${whileTitleString}"
+        while read key; do
+          case "$key" in
+            # if yes then continues the installation
+            y|yes) break ;;
+            n|no) exitCode 6 1 "Cancelled by user." ;;
+            *) printf  "${whileErrorString}" ; printf "${whileTitleString}" ;;
+          esac
+        done
+
+        printf "::${BOLD} Requesting root privilege  \n${RESTORE}"
+        sudo pacman -S "${pkg}" --asdeps ; exitStatus=$? ;
+        if [ "$exitStatus" -eq 1 ]; then
+          logMe 1 "pacman did not install '${pkg}'." 1
+
+          local whileTitleString="${BOLD}::${RESTORE} Should packy search the AUR? [y/n] : "
+          local whileErrorString="${RED}::${RESTORE} Error: Unknown option '$key'.${RESTORE}\n"
+          printf "${whileTitleString}"
+          while read key; do
+            case "$key" in
+              # if yes then continues the installation
+              y|yes) break ;;
+              n|no) exitCode 6 1 "Cancelled by user." ;;
+              *) printf  "${whileErrorString}" ; printf "${whileTitleString}" ;;
+            esac
+          done
+
+          logMe 0 "Recursive call for '${pkg}' "
+          # install depends as explicitly package
+          installPkg ${pkg} 1
+
+        fi
+      done
+
+      fi
+    fi
+  fi
+
+  # sets pkg directory and creates it
+  pkgLocation=$DOWNLOADLOCATION/$pkgString/$version
+  mkdir -p $pkgLocation
+
+  logMe 0 "Downloading '$pkgString'" 1
+  # downloads the package and puts it on the correct dir
+  curlURL=$(curl "https://aur.archlinux.org$urlPath" -o "$pkgLocation/$pkgString.tar.gz")
+  curlURLExitStatus=$?
+  # if donwload is a sucess
+  if [ "$curlURLExitStatus" -eq 0 ]; then
+    logMe 0 "Downloaded $pkgString.tar.gz to $pkgLocation" 1
+
+    pkgTarLocation=$pkgLocation/$pkgString.tar.gz
+    logMe 0 "Extracting $pkgString.tar.gz to $pkgLocation" 1
+
+    # extracts the pkg tar to the correct dir
+    tar -xvf $pkgTarLocation -C $pkgLocation --strip-components=1
+
+    logMe 0 "Extracted $pkgString.tar.gz to $pkgLocation" 1
+
+    local whileTitleString="::${BOLD} Continue with install?${RESTORE} [${BOLD}y${RESTORE}/${BOLD}n${RESTORE}] [${BOLD}v${RESTORE}]iew PKGBUILD [${BOLD}e${RESTORE}]dit : ${RESTORE}"
+    local whileErrorString="${RED}::${RESTORE} Error: Unknown option '$key'.${RESTORE}\n"
+    printf "${whileTitleString}"
+    while read key; do
+      case "$key" in
+        y|yes) break ;;
+        n|no) exitCode 6 1 "Cancelled by user." ;;
+        v|view) less $pkgLocation/PKGBUILD ;  printf "${whileTitleString}" ;;
+        e|edit) nano $pkgLocation/PKGBUILD ;  printf "${whileTitleString}" ;;
+        *) printf "${whileErrorString}" ; printf "${whileTitleString}" ;;
+      esac
+    done
+  else
+    exitCode 3 1 "Error downloading '$pkgString', aborting..."
+  fi
+
+  cd $pkgLocation
+
+  # makepkg with -s (build package) and -c (clean after sucessful build)
+  makepkg -sc
+  makePkgExitStatus=$?
+  # check if package is already built
+  if [ "$makePkgExitStatus" -eq 13 ]; then
+    logMe 2 "Package '$pkgString' is already built."
+    local whileTitleString="${YELLOW}::${RESTORE} ${BOLD}Package '$pkgString' is already built. Continue? [y/n] : ${RESTORE}"
+    local whileErrorString="${RED}::${RESTORE} Error: Unknown option '$key'.${RESTORE}\n"
+    printf "${whileTitleString}"
+    while read key; do
+      case "$key" in
+        # if yes then continues the installation
+        y|yes) continueInstall=1; break ;;
+        n|no) exitCode 6 1 "Cancelled by user." ;;
+        *) printf "${whileErrorString}" ; printf "${whileTitleString}" ;;
+      esac
+    done
+  fi
+
+  # check is makepkg compile sucessfully
+  if [[ "$makePkgExitStatus" -eq 0 || "$continueInstall" ]]; then
+    compilePkg=$(ls $pkgLocation/*.pkg.tar.zst)
+    echo ::${BOLD} makepkg complete.${RESTORE}
+    if [[ -e "$compilePkg" ]]; then
+
+      local whileTitleString="${BOLD}:: Install $pkgString? [y/n] : ${RESTORE}"
+      local whileErrorString="${RED}::${RESTORE} Error: Unknown option '$key'.${RESTORE}\n"
+      printf "$whileTitleString"
+      while read key; do
+        case "$key" in
+          y|yes) printf "::${BOLD} Requesting root privilege  \n${RESTORE}" ;
+                 # if the package to install is the main package then install it 'normally'
+                 # if not, then install its as a dependency
+                 if [[ "${mainPkg}" == 1 ]]; then
+                   sudo pacman -U $compilePkg ; exitStatus=$?
+                   if [ "$exitStatus" -eq 1 ]; then
+                     exitCode 6 1 "Cancelled by user. Use pacman -U $compilePkg to complete the install"
+                   fi
+                 else
+                   sudo pacman -U $compilePkg --asdeps; exitStatus=$?
+                   if [ "$exitStatus" -eq 1 ]; then
+                     exitCode 6 1 "Cancelled by user. Use pacman -U $compilePkg to complete the install"
+                   fi
+                 fi
+                 break ;;
+          n|no) exitCode 6 1 "Cancelled by user. Use pacman -U $compilePkg to complete the install" ;;
+          *) printf "${whileErrorString}" ; printf "${whileTitleString}" ;;
+        esac
+      done
+    fi
+  else
+
+    echo
+    logMe 1 "makepkg complete but errors!" 1
+    exitCode 3 1 "makepkg complete but errors!"
+  fi
+}
+
+checkUpdates() {
+  logMe 0 "Checking for updates. Here's a joke while you wait:" 1
+  jokeMe=$(shuf -n 1 "${PROGDIR}/silly-jokes")
+  logMe 0 "${jokeMe}" 1
+
+  # gets the number of foreign packages installed on the system
+  nInstalledPkgs=$(pacman -Qm | wc -l)
+  # gets the names of the foreign installed packages and puts it on an array
+  pkgNameLocal=( $(pacman -Qm | awk '{print $1}') )
+
+  # creates aur link
+  for ((i = 0 ; i < $nInstalledPkgs  ; i++)); do
+    link="arg[]=${pkgNameLocal[$i]}&${link}"
+  done
+  aurQuery="https://aur.archlinux.org/rpc/?${link}v=5&type=info"
+
+  resultJSON=$(curl -s "${aurQuery}")
+  totalResults=$(echo $resultJSON | jq -jr '.resultcount')
+  local pkgUpdates
+  local pkgOrphans
+  local pkgOutOfDate
+
+  # gets version from JSON and compares it with local package
+  for ((i = 0 ; i < $totalResults  ; i++)); do
+    local pkg=$(echo $resultJSON | jq -jr '.results['$i'] |"\(.Name)"')
+    local ver=$(echo $resultJSON | jq -jr '.results['$i'] |"\(.Version)"')
+
+    local maintainer=$(echo $resultJSON | jq -jr '.results['$i'] | "\(.Maintainer)"')
+    if [ "$maintainer" == "null" ]; then
+      logMe 0 "Package '${pkg}' is orphan."
+      pkgOrphans=("${pkgOrphans[@]}" "${pkg}")
+    fi
+
+    local outOfDate=$(echo $resultJSON | jq -jr '.results['$i'] | "\(.OutOfDate)"')
+    # check if out of date is null. if value is null, then package is up-to-date
+    if [ ! "${outOfDate}" == "null" ]; then
+      outOfDate=$(date -d@${outOfDate})
+      logMe 0 "Package '${pkg}' flagged out of date since $outOfDate"
+      pkgOutOfDate=("${pkgOutOfDate[@]}" "${pkg}")
+    fi
+
+    local pkgVersLocal=$(pacman -Qm $pkg | awk '{print $2}')
+
+    checkV=$(printf '%s\n' "${pkgVersLocal}" "$ver" | sort -V | sed -n 1p)
+    if [[ "$checkV" != "$ver" ]]; then
+      logMe 0 "Package '${pkg}' with update avaiable: ${pkgVersLocal} ==> $ver"
+      pkgUpdates=("${pkgUpdates[@]}" "${pkg}")
+    fi
+  done
+
+  #echo ":: Updates avaiable for : ${pkgUpdates[@]}"
+  echo ":: Orpahn packages : ${pkgOrphans[@]}"
+  echo ":: Out of date packages : ${pkgOutOfDate[@]}"
+
+  if [[ ! "${#pkgUpdates[@]}" -eq 0 ]]; then
+    printf "\e[1m%-16s\e[0m\n" "Updates avaiable for:"
+    printf "\e[1m%-2s %-2s %-16s %-16s\e[0m\n" "[#]" "" "Package Name"
+    for ((i = 0 ; i < ${#pkgUpdates[@]} ; i++)); do
+      local pkg=${pkgUpdates[$i]}
+      printf "%-2s %-2s %-16s %-16s\n" "[$i]" "->" "${pkg}"
+    done
+
+    local whileTitleString="${GREEN}::${RESTORE} Do you want to update them? [y/n] : ${RESTORE}"
+    local whileErrorString="${RED}::${RESTORE} Error: Unknown option '$key'.${RESTORE}\n"
+    printf "${whileTitleString}"
+    while read key; do
+      case "$key" in
+        # if yes then continues the installation
+        y|yes) break ;;
+        n|no) logMe 0 "Done." 1 ; exitCode 0 ;;
+        *) printf  "${whileErrorString}" ; printf "${whileTitleString}" ;;
+      esac
+    done
+
+    for ((i = 0 ; i < ${#pkgUpdates[@]} ; i++)); do
+      local pkg=${pkgUpdates[$i]}
+      echo "${GREEN}${BOLD}::${RESTORE} Now installing '$pkg' [$(($i+1))/${#pkgUpdates[@]}]${RESTORE}"
+      logMe 0 "Updating $pkg"
+      installPkg $pkg 1
+    done
+
+  fi
+
+  logMe 0 "Complete." 1
+  exitCode 0 1
+}
+
+#main function
+main() {
+
+  # log start of the script
+  #logMe "Start at $(date --date "${PROGSTARTTIME}" +"%Y/%m/%d %H:%M:%S")"
+  logMe 0 "packy started" 1
+
+  # help flag
+  # If true, calls help funtion
+  if [ "${printHelp}" ]; then
+    printHelp
+    logMe 0 "Complete."
+    exitCode 0
+  fi
+
+  # Search flag
+  # If true, calls search funtion
+  if [ "${searchPkgF}" ]; then
+    if [ "${searchInfoF}" ]; then
+      search ${searchPkg} "info"
+    fi
+
+    # if true, search pkg list
+    if [ "${searchPkgListF}" ]; then
+      search ${searchPkg} "list"
+    fi
+    search ${searchPkg}
+  fi
+
+  # Update flag
+  # If true, calls update funtion
+  if [ "${checkUpdatesF}" ]; then
+    checkUpdates
+  fi
+
+  # if script reachs here, then it went without any errors, nice.
+  logMe 0 "Complete." 1
+  exitCode 0
+}
+
+# run main function
+main

@@ -1,0 +1,61 @@
+#!/bin/bash
+# yaru sounds is from ubuntu. I got it from this git repo: https://github.com/ubuntu/yaru. thanks!
+
+# check if dependencies are met
+dependencies=("libpulse")
+for pkg in ${dependencies[@]}; do
+  checkDependency=$(pacman -Q $pkg)
+  exitStatus=$?
+  if [ "$exitStatus" -eq 1 ]; then
+    notify-send "Error !" "Please install '$pkg' to play notification sound or change the default player in i3sounds"
+    echo "Error ! Please install '$pkg' to play notification sound or change the default player in i3sounds"
+    exit 2
+  fi
+done
+
+# get script dir
+# https://stackoverflow.com/a/246128
+readonly PROGDIR="$( cd -- "$( dirname -- "${BASH_SOURCE[0]}" )" &> /dev/null && pwd )"
+
+player=paplay
+soundsFolder=${PROGDIR}/i3sounds.d/yaru
+case "$1" in
+    default)
+        $player $soundsFolder/bell.oga
+        ;;
+    volume)
+        $player $soundsFolder/audio-volume-change.oga
+        ;;
+    question)
+        $player $soundsFolder/dialog-question.oga
+        ;;
+    complete)
+        $player $soundsFolder/complete.oga
+        ;;
+    error)
+        $player $soundsFolder/dialog-error.oga
+        ;;
+    device-on)
+        $player $soundsFolder/device-added.oga
+        ;;
+    device-off)
+        $player $soundsFolder/device-removed.oga
+        ;;
+    login)
+        $player $soundsFolder/desktop-login.oga
+        ;;
+    logout)
+        $player $soundsFolder/desktop-logoff.oga
+        ;;
+    power-plug)
+        $player $soundsFolder/power-plug.oga
+        ;;
+    power-unplug)
+        $player $soundsFolder/power-unplug.oga
+        ;;
+    *)
+        echo "Usage: $0 [default|volume|question|complete|error|device-on|device-off|login|logout|power-plug|power-unplug]"
+        exit 2
+esac
+
+exit 0
