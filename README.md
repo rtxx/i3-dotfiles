@@ -29,6 +29,21 @@ find 'gitfolder' -type d -print0 | xargs -0 chmod 775
 
 ### Theme
 I created a script named ```sunset``` that automatically changes the theme from a bunch of programs. It's very, **very** barebones script. Check it [here](https://github.com/rtxx/scripts/tree/main/sunset).
+#### Note about i3 folder sctructure
+```
+i3
+  | config.d
+    | theme.conf
+    | main.conf
+  | config
+  | makeconfig
+```
+This is the file sctructure for i3 and i3status. It uses ```makeconfig``` to *glue* ```main.conf``` and ```theme.conf```, replacing the main ```config```. Same for i3status. If some change is needed, change ```main.conf``` and remake the main ```config``` using ```makeconfig```.
+
+I added to ```.bashrc``` aliases ```i3-edit-config```, ```i3-remake-config```, ```i3status-edit-config``` and ```i3status-remake-config``` for convenience.
+
+There's also ```i3-edit-config-gui``` and ```i3status-edit-config-gui``` that launchs the default GUI application for text files using ```xdg-open```.
+
 
 ### Terminal
 Append ```TERMINAL=kitty``` to ```/etc/environment```
