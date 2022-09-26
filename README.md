@@ -2,7 +2,7 @@
 ## My personal dotfiles for i3 (and Arch Linux)
 
 Warning!
-This is my personal dotfiles and configurations that I use with i3 and Arch Linux so stuff may not work OOTB. Please be free to check it out, but be careful, some of the settings is made for my hardware (Example: in my i3status config contains specific configs for my wifi and ethernet).
+This is my personal dotfiles and configurations that I use with i3 and Arch Linux so stuff may not work OOTB. Please be free to check it out, but be careful, some of the settings is made for my hardware (Example: in i3status config file, it contains specific settings for my wifi and ethernet).
 
 | ![i3](https://cloud.ducknexus.xyz/s/eAbRyqLxT8rjKnG/download/i3.gif)  |  ![sunset](https://cloud.ducknexus.xyz/s/LFoZZHptbmG9zz9/download/sunset.gif) |
 |---|---|
