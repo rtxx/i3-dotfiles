@@ -1,8 +1,10 @@
 {
   "sunsetLocation" : "$HOME/.config/i3/config.d/scripts/sunset/sunset",
   "lightTheme": "materia-light",
-  "lightThemeSetting" : "-gqwx",
+  "lightThemeSetting" : "-gqwxk",
   "darkTheme" : "materia-dark",
-  "darkThemeSetting" : "-gqwx"
+  "darkThemeSetting" : "-gqwxk",
+  "changeLightThemeAt" : "10:00",
+  "changeDarkThemeAt" : "18:00"
 }
 
