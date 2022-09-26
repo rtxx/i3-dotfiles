@@ -27,7 +27,8 @@ def lightTheme():
   sunsetLocation = configs['sunsetLocation']
   lightThemeName = configs['lightTheme']
   lightThemeSetting = configs['lightThemeSetting']
-
+  #lightThemeTime = configs['changeLightThemeAt']
+  
   # sends info to sunset
   os.system("bash "+ sunsetLocation + " " + lightThemeSetting  + " " + lightThemeName)
 
@@ -43,9 +44,25 @@ def darkTheme():
   sunsetLocation = configs['sunsetLocation']
   darkThemeName = configs['darkTheme']
   darkThemeSetting = configs['darkThemeSetting']
+  #darkThemeTime = configs['changeDarkThemeAt']
 
   # sends info to sunset
   os.system("bash "+ sunsetLocation + " " + darkThemeSetting + " " + darkThemeName)
+
+  # closes config.json
+  f.close()
+
+def setSchedule():
+
+  # loads config.json into f
+  with open(PROGCONFIGFILE, 'r') as f:
+    configs = json.load(f)
+
+  lightThemeTime = configs['changeLightThemeAt']
+  darkThemeTime = configs['changeDarkThemeAt']
+
+  schedule.every().day.at(lightThemeTime).do(lightTheme)
+  schedule.every().day.at(darkThemeTime).do(darkTheme)
 
   # closes config.json
   f.close()
@@ -64,10 +81,6 @@ def scheduleFunction():
 def iconTrayFunction():
   icon.run()
 
-def test():
-  now = datetime.now()
-  print(now)
-
 def quit():
   print('Quitting...')
   # https://stackoverflow.com/a/1489838
@@ -75,7 +88,6 @@ def quit():
   os._exit(1)
 
 if __name__ == "__main__":
-
   image = Image.open(PROGCONFIGDIR + "/icon.png")
   menu = (item('Light theme', lightTheme),
           item('Dark Theme', darkTheme),
@@ -85,10 +97,11 @@ if __name__ == "__main__":
             item('Exit',quit))))
 
   icon = pystray.Icon("sunset", image, "sunset", menu)
-
-  schedule.every().day.at("10:00").do(lightTheme)
-  schedule.every().day.at("18:00").do(darkTheme)
-
+ 
+  setSchedule()
+  #schedule.every().day.at(lightThemeTime).do(lightTheme)
+  #schedule.every().day.at(darkThemeTime).do(darkTheme)
+ 
   # creates threads
   scheduleThread = Thread(target=scheduleFunction)
   trayIconThread = Thread(target=iconTrayFunction)
