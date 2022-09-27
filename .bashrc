@@ -77,7 +77,7 @@ alias help-pacman='bash ~/.config/i3/config.d/scripts/help-pacman'
 alias packy='bash ~/.config/i3/config.d/scripts/packy/packy'
 
 # check news from arch
-#alias archnews='bash ~/Coding/archnews/archnews'
+alias archnews='bash ~/.config/i3/config.d/scripts/archnews/archnews'
 
 # download playlist to mp3 from youtube
 #alias youtube-dl-playlist="./home/live/Applications/yt-dlp -i --extract-audio --audio-format mp3 -o '%(title)s.%(ext)s'"

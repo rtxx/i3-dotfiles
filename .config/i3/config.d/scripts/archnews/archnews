@@ -1,0 +1,64 @@
+#!/bin/bash
+
+# check if dependencies are met
+dependencies=("libxml2")
+for pkg in ${dependencies[@]}; do
+  checkDependency=$(pacman -Q $pkg)
+  exitStatus=$?
+  if [ "$exitStatus" -eq 1 ]; then
+    echo ${BOLD}:: Error ! Please install $pkg ${RESTORE}
+    exit 2
+  fi
+done
+
+xmlFile="/tmp/xmlFile"
+downloadXMLFile=$(curl -s "https://archlinux.org/feeds/news/" -o $xmlFile)
+
+# clean temporary files on exit
+if [[ -e "$xmlFile" ]]; then
+  trap "rm $xmlFile" EXIT
+fi
+
+# for testing
+#xmlFile="xmlFile"
+
+
+# color support, thanks https://gist.github.com/elucify/c7ccfee9f13b42f11f81
+RESTORE=$(echo -en '\033[0m')
+RED=$(echo -en '\033[00;31m')
+GREEN=$(echo -en '\033[00;32m')
+YELLOW=$(echo -en '\033[00;33m')
+BLUE=$(echo -en '\033[00;34m')
+MAGENTA=$(echo -en '\033[00;35m')
+PURPLE=$(echo -en '\033[00;35m')
+CYAN=$(echo -en '\033[00;36m')
+LIGHTGRAY=$(echo -en '\033[00;37m')
+LRED=$(echo -en '\033[01;31m')
+LGREEN=$(echo -en '\033[01;32m')
+LYELLOW=$(echo -en '\033[01;33m')
+LBLUE=$(echo -en '\033[01;34m')
+LMAGENTA=$(echo -en '\033[01;35m')
+LPURPLE=$(echo -en '\033[01;35m')
+LCYAN=$(echo -en '\033[01;36m')
+WHITE=$(echo -en '\033[01;37m')
+BOLD=$(echo -en '\033[1m')
+
+printf "${BOLD}Arch latest news${RESTORE} \n"
+#printf "${BOLD}Please review before updating ${RESTORE} \n"
+
+nEntries="3"
+for ((i = 1 ; i <= nEntries ; i++)); do
+  title=$(xmllint --xpath 'string(/rss/channel/item['$i']/title)' $xmlFile)
+  pubDate=$(xmllint --xpath 'string(/rss/channel/item['$i']/pubDate)' $xmlFile)
+  description=$(xmllint --xpath 'string(/rss/channel/item['$i']/description)' $xmlFile | sed -e 's/<[^>]*>//g' )
+
+  #printf "${BOLD}%-4s %-32s %-32s${RESTORE} \n" "[$i]" "$title" "$pubDate"
+  #printf "$description \n" | sed 's/^/   /'
+  printf "${BOLD}'%.32s' from %.32s${RESTORE}  \n" "$title" "$pubDate"
+  printf "%2s \n" "$description" | sed 's/^/   /'
+
+  #echo "${BOLD}--> '$title' from $pubDate${RESTORE}"
+  #echo -e "$description \n" | sed -e 's/<[^>]*>\n//g' | sed 's/^/   /'
+
+done
+
