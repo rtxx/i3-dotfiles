@@ -4,10 +4,9 @@
 Warning!
 This is my personal dotfiles and configurations that I use with i3 and Arch Linux so stuff may not work OOTB. Please be free to check it out, but be careful, some of the settings is made for my hardware (Example: in i3status config file, it contains specific settings for my wifi and ethernet).
 
-| ![i3](https://cloud.ducknexus.xyz/s/eAbRyqLxT8rjKnG/download/i3.gif)  |  ![sunset](https://cloud.ducknexus.xyz/s/LFoZZHptbmG9zz9/download/sunset.gif) |
+|  ![i3](https://cloud.ducknexus.xyz/s/eAbRyqLxT8rjKnG/download/i3.gif) | ![sunset](https://cloud.ducknexus.xyz/s/LFoZZHptbmG9zz9/download/sunset.gif)  |
 |---|---|
-
-
+| ![desktop](https://cloud.ducknexus.xyz/s/wmmxbydo7pDAtEo/download/ss1.png)  |  ![lightdm](https://cloud.ducknexus.xyz/s/qRBjmKbmicmB7cA/download/vm-lighdm.png) |
 
 ## Prerequisites
 ### Arch repositories
