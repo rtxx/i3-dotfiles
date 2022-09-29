@@ -53,6 +53,7 @@ cd /tmp/i3-dotfiles-$currentDate
 echo ${GREEN}"::"${RESTORE}" Getting files from git"
 if ! git clone https://github.com/rtxx/i3-dotfiles.git ; then
   echo ${RED}"::"${RESTORE}" Error! Something went wrong with git. Check your connection maybe?"
+  rm -rf /tmp/i3-dotfiles-$currentDate
   exit
 fi
 
@@ -80,12 +81,11 @@ chmod +x $GITFOLDER/.config/i3/config.d/scripts/sunset/sunset-gui.py
 
 echo ${GREEN}"::"${RESTORE}" Moving 'i3-dotfiles' to '$USER' home folder"
 mv /tmp/i3-dotfiles-$currentDate/* "/home/$USER"
+
 echo ${GREEN}"::"${RESTORE}" Removing temp files"
 rm -rf /tmp/i3-dotfiles-$currentDate
 
 echo ${GREEN}"::"${RESTORE}" Done. Check your home folder. It should be a folder named 'i3-dotfiles'"
-
-
 ```
  **Note**: If you dont see the files inside ```i3-dotfiles```, it's because they are hidden, don't forget!
 ### About i3 folder sctructure
