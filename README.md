@@ -20,11 +20,39 @@ qt5ct-kde python-schedule python-pystray python-pydbus yay-bin
 ```
 ## Setup
 ### Setup script
-Download the repository and extract it. Copy the code below and make a script next to the extracted folder. It should be named ```i3-dotfiles-main```. Run it with ```bash [script name]``` in a terminal and then copy the files inside ```i3-dotfiles-main``` to your home folder.
+Copy the code below, save it to a file and run it with ```bash [script name]``` in a terminal. When completed, a folder named ```i3-dotfiles``` is created on the home folder of the current user. Copy the files to your home folder. Dont forget to make a backup first!
 ```
 #!/bin/bash
-GITFOLDER=i3-dotfiles-main
 
+# check if dependencies are met
+dependencies=("git")
+for pkg in ${dependencies[@]}; do
+  checkDependency=$(pacman -Q $pkg)
+  exitStatus=$?
+  if [ "$exitStatus" -eq 1 ]; then
+    echo "-> Error! Please install '$pkg'"
+    exit 2
+  fi
+done
+
+GITFOLDER=i3-dotfiles
+currentDate=$(date '+%Y%m%d-%H%M%S')
+
+if [ -d "/home/$USER/$GITFOLDER" ]; then
+  echo "-> Error! 'i3-dotfiles' dir already exists on '$USER' home folder. Please remove it. "
+  exit
+fi
+
+mkdir /tmp/i3-dotfiles-$currentDate
+cd /tmp/i3-dotfiles-$currentDate
+
+echo "-> Getting files from git"
+if ! git clone https://github.com/rtxx/i3-dotfiles.git ; then
+  echo "-> Something went wrong with git. Check your connection maybe?"
+  exit
+fi
+
+echo "-> Fixing permissions"
 chown -R $USER:$USER $GITFOLDER
 find $GITFOLDER -type f -print0 | xargs -0 chmod 664
 find $GITFOLDER -type d -print0 | xargs -0 chmod 775
@@ -46,8 +74,15 @@ chmod +x $GITFOLDER/.config/i3/config.d/scripts/packy/packy
 chmod +x $GITFOLDER/.config/i3/config.d/scripts/sunset/sunset
 chmod +x $GITFOLDER/.config/i3/config.d/scripts/sunset/sunset-gui.py
 
+echo "-> Moving to 'i3-dotfiles' to '$USER' home folder"
+mv /tmp/i3-dotfiles-$currentDate/* ~
+echo "-> Removing temp files"
+rm -rf /tmp/i3-dotfiles-$currentDate
+
+echo "-> Done. Check your home folder. It should be a folder named 'i3-dotfiles'"
+
 ```
- **Note**: If you dont see the files inside ```i3-dotfiles-main```, it's because they are hidden, don't forget!
+ **Note**: If you dont see the files inside ```i3-dotfiles```, it's because they are hidden, don't forget!
 ### About i3 folder sctructure
 ```
 i3
