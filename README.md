@@ -44,7 +44,7 @@ currentDate=$(date '+%Y%m%d-%H%M%S')
 
 if [ -d "/home/$USER/$GITFOLDER" ]; then
   echo ${RED}"::"${RESTORE}" Error! 'i3-dotfiles' dir already exists on '$USER' home folder. Please remove it."
-  exit
+  exit 2
 fi
 
 mkdir /tmp/i3-dotfiles-$currentDate
@@ -54,7 +54,7 @@ echo ${GREEN}"::"${RESTORE}" Getting files from git"
 if ! git clone https://github.com/rtxx/i3-dotfiles.git ; then
   echo ${RED}"::"${RESTORE}" Error! Something went wrong with git. Check your connection maybe?"
   rm -rf /tmp/i3-dotfiles-$currentDate
-  exit
+  exit 2
 fi
 
 echo ${GREEN}"::"${RESTORE}" Fixing permissions"
