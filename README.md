@@ -82,6 +82,8 @@ chmod +x $GITFOLDER/.config/i3/config.d/scripts/packy/packy
 chmod +x $GITFOLDER/.config/i3/config.d/scripts/sunset/sunset
 chmod +x $GITFOLDER/.config/i3/config.d/scripts/sunset/sunset-gui.py
 
+chmod +x $GITFOLDER/.config/jgmenu/startup
+
 echo ${GREEN}"::"${RESTORE}" Moving 'i3-dotfiles' to '$USER' home folder"
 mv /tmp/i3-dotfiles-$currentDate/* "/home/$USER"
 
