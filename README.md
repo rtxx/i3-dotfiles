@@ -24,13 +24,17 @@ Copy the code below, save it to a file and run it with ```bash [script name]``` 
 ```
 #!/bin/bash
 
+RESTORE=$(echo -en '\033[0m')
+RED=$(echo -en '\033[00;31m')
+GREEN=$(echo -en '\033[00;32m')
+
 # check if dependencies are met
 dependencies=("git")
 for pkg in ${dependencies[@]}; do
   checkDependency=$(pacman -Q $pkg)
   exitStatus=$?
   if [ "$exitStatus" -eq 1 ]; then
-    echo "-> Error! Please install '$pkg'"
+    echo ${RED}"::"${RESTORE}" Error! Please install '$pkg'"
     exit 2
   fi
 done
@@ -39,20 +43,20 @@ GITFOLDER=i3-dotfiles
 currentDate=$(date '+%Y%m%d-%H%M%S')
 
 if [ -d "/home/$USER/$GITFOLDER" ]; then
-  echo "-> Error! 'i3-dotfiles' dir already exists on '$USER' home folder. Please remove it. "
+  echo ${RED}"::"${RESTORE}" Error! 'i3-dotfiles' dir already exists on '$USER' home folder. Please remove it."
   exit
 fi
 
 mkdir /tmp/i3-dotfiles-$currentDate
 cd /tmp/i3-dotfiles-$currentDate
 
-echo "-> Getting files from git"
+echo ${GREEN}"::"${RESTORE}" Getting files from git"
 if ! git clone https://github.com/rtxx/i3-dotfiles.git ; then
-  echo "-> Something went wrong with git. Check your connection maybe?"
+  echo ${RED}"::"${RESTORE}" Error! Something went wrong with git. Check your connection maybe?"
   exit
 fi
 
-echo "-> Fixing permissions"
+echo ${GREEN}"::"${RESTORE}" Fixing permissions"
 chown -R $USER:$USER $GITFOLDER
 find $GITFOLDER -type f -print0 | xargs -0 chmod 664
 find $GITFOLDER -type d -print0 | xargs -0 chmod 775
@@ -74,12 +78,13 @@ chmod +x $GITFOLDER/.config/i3/config.d/scripts/packy/packy
 chmod +x $GITFOLDER/.config/i3/config.d/scripts/sunset/sunset
 chmod +x $GITFOLDER/.config/i3/config.d/scripts/sunset/sunset-gui.py
 
-echo "-> Moving to 'i3-dotfiles' to '$USER' home folder"
-mv /tmp/i3-dotfiles-$currentDate/* ~
-echo "-> Removing temp files"
+echo ${GREEN}"::"${RESTORE}" Moving 'i3-dotfiles' to '$USER' home folder"
+mv /tmp/i3-dotfiles-$currentDate/* "/home/$USER"
+echo ${GREEN}"::"${RESTORE}" Removing temp files"
 rm -rf /tmp/i3-dotfiles-$currentDate
 
-echo "-> Done. Check your home folder. It should be a folder named 'i3-dotfiles'"
+echo ${GREEN}"::"${RESTORE}" Done. Check your home folder. It should be a folder named 'i3-dotfiles'"
+
 
 ```
  **Note**: If you dont see the files inside ```i3-dotfiles```, it's because they are hidden, don't forget!
