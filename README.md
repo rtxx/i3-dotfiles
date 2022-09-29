@@ -47,6 +47,7 @@ chmod +x $GITFOLDER/.config/i3/config.d/scripts/sunset/sunset
 chmod +x $GITFOLDER/.config/i3/config.d/scripts/sunset/sunset-gui.py
 
 ```
+ **Note**: If you dont see the files inside ```i3-dotfiles-main```, it's because they are hidden, don't forget!
 ### About i3 folder sctructure
 ```
 i3
