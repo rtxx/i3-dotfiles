@@ -19,13 +19,34 @@ pacman -Syu --needed nano sudo bash-completion man pacman-contrib amd-ucode inte
 qt5ct-kde python-schedule python-pystray python-pydbus yay-bin
 ```
 ## Setup
-Fix the permissions from git:
+### Setup script
+Download the repository and extract it. Copy the code below and make a script next to the extracted folder. It should be named ```i3-dotfiles-main```. Run it with ```bash [script name]``` in a terminal and then copy the files inside ```i3-dotfiles-main``` to your home folder.
 ```
-chown -R $USER:$USER 'gitfolder'
-find 'gitfolder' -type f -print0 | xargs -0 chmod 664
-find 'gitfolder' -type d -print0 | xargs -0 chmod 775
-```
+#!/bin/bash
+GITFOLDER=i3-dotfiles-main
 
+chown -R $USER:$USER $GITFOLDER
+find $GITFOLDER -type f -print0 | xargs -0 chmod 664
+find $GITFOLDER -type d -print0 | xargs -0 chmod 775
+
+chmod +x $GITFOLDER/.config/i3/makeconfig
+chmod +x $GITFOLDER/.config/i3status/makeconfig
+
+chmod +x $GITFOLDER/.config/i3/config.d/scripts/emojiget.py
+chmod +x $GITFOLDER/.config/i3/config.d/scripts/check-updates
+chmod +x $GITFOLDER/.config/i3/config.d/scripts/emojipick
+chmod +x $GITFOLDER/.config/i3/config.d/scripts/feh-blur
+chmod +x $GITFOLDER/.config/i3/config.d/scripts/help-pacman
+chmod +x $GITFOLDER/.config/i3/config.d/scripts/i3exit
+chmod +x $GITFOLDER/.config/i3/config.d/scripts/i3services
+
+chmod +x $GITFOLDER/.config/i3/config.d/scripts/archnews/archnews
+chmod +x $GITFOLDER/.config/i3/config.d/scripts/i3sounds/i3sounds
+chmod +x $GITFOLDER/.config/i3/config.d/scripts/packy/packy
+chmod +x $GITFOLDER/.config/i3/config.d/scripts/sunset/sunset
+chmod +x $GITFOLDER/.config/i3/config.d/scripts/sunset/sunset-gui.py
+
+```
 ### About i3 folder sctructure
 ```
 i3
