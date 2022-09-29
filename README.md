@@ -53,12 +53,15 @@ cd /tmp/i3-dotfiles-$currentDate
 echo ${GREEN}"::"${RESTORE}" Getting files from git"
 if ! git clone https://github.com/rtxx/i3-dotfiles.git ; then
   echo ${RED}"::"${RESTORE}" Error! Something went wrong with git. Check your connection maybe?"
-  rm -rf /tmp/i3-dotfiles-$currentDate
+  rm --recursive --force /tmp/i3-dotfiles-$currentDate
   exit 2
 fi
 
+echo ${GREEN}"::"${RESTORE}" Removing .git folder"
+rm --recursive --force /tmp/i3-dotfiles-$currentDate/$GITFOLDER/.git
+
 echo ${GREEN}"::"${RESTORE}" Fixing permissions"
-chown -R $USER:$USER $GITFOLDER
+chown --recursive $USER:$USER $GITFOLDER
 find $GITFOLDER -type f -print0 | xargs -0 chmod 664
 find $GITFOLDER -type d -print0 | xargs -0 chmod 775
 
@@ -83,9 +86,10 @@ echo ${GREEN}"::"${RESTORE}" Moving 'i3-dotfiles' to '$USER' home folder"
 mv /tmp/i3-dotfiles-$currentDate/* "/home/$USER"
 
 echo ${GREEN}"::"${RESTORE}" Removing temp files"
-rm -rf /tmp/i3-dotfiles-$currentDate
+rm --recursive --force /tmp/i3-dotfiles-$currentDate
 
 echo ${GREEN}"::"${RESTORE}" Done. Check your home folder. It should be a folder named 'i3-dotfiles'"
+
 ```
  **Note**: If you dont see the files inside ```i3-dotfiles```, it's because they are hidden, don't forget!
 ### About i3 folder sctructure
